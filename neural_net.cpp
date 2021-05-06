@@ -2,19 +2,23 @@
 
 
 NNet::NNet(const std::vector<int>& _topology){
+    std::mt19937 rnd(42);
     topology = _topology;
     int n = topology.size();
     mesh.resize(n);
     bias.resize(n);
+    bare_bias.resize(n);
     weights.resize(n);
+    bare_weights.resize(n);
+    std::uniform_real_distribution<double> dist(-1., 1.);
     for (int i = 0; i < n; ++i){
-        bias[i].resize(topology[i]);
+        bare_bias[i].resize(topology[i], 0);
+        bias[i].resize(topology[i], dist(rnd));
         mesh[i].resize(topology[i]);
-        if (i != n-1) weights[i].resize(topology[i], Layer(topology[i+1]));
+        if (i != n-1) weights[i].resize(topology[i], Layer(topology[i+1], dist(rnd)));
+        if (i != n-1) bare_weights[i].resize(topology[i], Layer(topology[i+1], 0));
     }
     meshZ = mesh;
-    bare_bias = bias;
-    bare_weights = weights;
 }
 
 void NNet::fit(const matrix& X, const Layer& y, int iterations, int shot){
@@ -49,6 +53,10 @@ Layer NNet::propagate_back(int layer, const Layer& delta, matrixList& derivative
     Layer ndelta = weights[layer] * delta;
     ndelta = ndelta * activation_function_derivative(meshZ[layer]);
 
+    if (std::isnan(ndelta[1]) || std::isnan(ndelta[0]) || std::isnan(ndelta[2])){
+        int lol = 3;
+    }
+
     bias_derivative[layer] = bias_derivative[layer] + ndelta;
     derivative[layer-1] = derivative[layer-1] + (layer_to_matrix(mesh[layer-1]) * (!delta));
     return ndelta;
@@ -67,11 +75,22 @@ void NNet::train(const std::vector<int>& cur_shuffler, const matrix& X, const La
         for (int layer = 0; layer < (int) topology.size() - 1; ++layer)
             propagate_front(layer);
 
+        // softmax of last layer
+        double summ = 0;
+        for (int i = 0; i < topology.back(); ++i)
+            summ += std::exp(meshZ.back()[i]);
+        for (int i = 0; i < topology.back(); ++i)
+            mesh.back()[i] = (summ == 0 ? 0 : std::exp(meshZ.back()[i]) / summ);
+
         // generating delta of the last layer
         Layer delta(topology.back(), 0);
         delta[y[cur]] = 1.0;
         delta = mesh.back() + (-delta);
         delta = delta * activation_function(meshZ.back());
+
+        if (std::isnan(delta[1])){
+            int lol = 3;
+        }
 
         // updating derivative for the last layer
         bias_derivative.back() = bias_derivative.back() + delta;
@@ -82,13 +101,18 @@ void NNet::train(const std::vector<int>& cur_shuffler, const matrix& X, const La
             delta = propagate_back(layer, delta, derivative, bias_derivative);
     }
 
-    derivative = derivative * (1.0 / (double) cur_shuffler.size());
-    bias_derivative = bias_derivative * (1.0 / (double) cur_shuffler.size());
+    if (cur_shuffler.empty()){
+        std::cerr << "cur_shuffler.size() == 0\n";
+        exit(EXIT_FAILURE);
+    }
+    derivative = derivative * (1.0 / (double) cur_shuffler.size()) * alpha;
+    bias_derivative = bias_derivative * (1.0 / (double) cur_shuffler.size()) * alpha;
 
     weights = weights - derivative;
     bias = bias - bias_derivative;
 
     if (clock() - start > 10000){
+//        std::cout << "w = " << weights[1][0][0] << std::endl;
         start = clock();
         double summ = cost({1, 1}, 0) + cost({1, 0}, 1) + cost({0, 1}, 1) + cost({0, 0}, 0);
         summ /= 4.;
@@ -104,6 +128,13 @@ int NNet::predict(Layer X){
     // front propagation
     for (int layer = 0; layer < (int) topology.size() - 1; ++layer)
         propagate_front(layer);
+
+    // softmax of last layer
+    double summ = 0;
+    for (int i = 0; i < topology.back(); ++i)
+        summ += std::exp(meshZ.back()[i]);
+    for (int i = 0; i < topology.back(); ++i)
+        mesh.back()[i] = (summ == 0 ? 0 : std::exp(meshZ.back()[i]) / summ);
 
     // calculating the best variant
     int best_variant = 0;
@@ -125,6 +156,13 @@ double NNet::cost(Layer X, int y){
     // front propagation
     for (int layer = 0; layer < (int) topology.size() - 1; ++layer)
         propagate_front(layer);
+
+    // softmax of last layer
+    double summ = 0;
+    for (int i = 0; i < topology.back(); ++i)
+        summ += std::exp(meshZ.back()[i]);
+    for (int i = 0; i < topology.back(); ++i)
+        mesh.back()[i] = (summ == 0 ? 0 : std::exp(meshZ.back()[i]) / summ);
 
     // calculating cost function
     double cost = 0;

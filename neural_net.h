@@ -15,6 +15,7 @@ public:
     void propagate_front(int layer);
     Layer propagate_back(int layer, const Layer& delta, matrixList& derivative, matrix& bias_derivative);
 private:
+    double alpha = 0.3;
     clock_t start;
     std::vector<int> topology;
     matrix mesh, meshZ, bias, bare_bias;

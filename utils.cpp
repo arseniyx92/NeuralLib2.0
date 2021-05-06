@@ -135,7 +135,7 @@ Layer activation_function(const Layer& a){
     int n = a.size();
     Layer b(n);
     for (int i = 0; i < n; ++i)
-        b[i] = sigmoid(a[i]);
+        b[i] = ReLU(a[i]);
     return b;
 }
 
@@ -143,7 +143,7 @@ Layer activation_function_derivative(const Layer& a){
     int n = a.size();
     Layer b(n);
     for (int i = 0; i < n; ++i)
-        b[i] = sigmoid_derivative(a[i]);
+        b[i] = ReLU_derivative(a[i]);
     return b;
 }
 

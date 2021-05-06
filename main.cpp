@@ -14,13 +14,13 @@ int main() {
 //    y = {0, 1, 1, 0};
 //        X = {{1, 1}};
 //        y = {0};
-        X = {{0, 0}, {1, 0}};
-        y = {0, 1};
-//    for (int i = 0; i < 200; ++i){
+        X = {{0, 0}, {1, 0}, {0, 1}};
+        y = {0, 1, 1};
+//    for (int i = 0; i < 20; ++i){
 //        X.push_back({(double)(rnd()%2), (double)(rnd()%2)});
 //        y.push_back({(double)((int)X.back()[0] ^ (int)X.back()[1])});
 //    }
-    NNet net({2, 2, 2, 2});
+    NNet net({2, 3, 2});
     net.fit(X, y, 20000, 2);
     cout << net.predict({1, 1}) << std::endl;
     cout << net.predict({1, 0}) << std::endl;
